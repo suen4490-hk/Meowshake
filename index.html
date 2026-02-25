@@ -58,6 +58,13 @@
             animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
         }
 
+        /* Gray out the cat when cooling down */
+        .cooldown {
+            opacity: 0.7;
+            filter: grayscale(0.5);
+            cursor: wait;
+        }
+
         @keyframes shake {
             10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-5deg); }
             20%, 80% { transform: translate3d(2px, 0, 0) rotate(5deg); }
@@ -66,7 +73,7 @@
         }
 
         #ios-permission-btn {
-            display: none; /* Hidden by default */
+            display: none;
             margin-top: 30px;
             padding: 12px 24px;
             background-color: #007AFF;
@@ -122,14 +129,26 @@
         const audio = new Audio();
         audio.src = audioSrc;
 
+        // --- CONFIGURATION ---
+        const SHAKE_THRESHOLD = 15; 
+        const COOLDOWN_TIME = 1000; // 1000ms = 1 second wait time between meows
+        
+        let isCoolingDown = false; // The "Stop Gap" flag
+
         function log(msg) {
             debug.textContent = msg;
         }
 
         function playMeow() {
+            // 1. CHECK: If we are in cooldown, STOP immediately.
+            if (isCoolingDown) return;
+
+            // 2. LOCK: Set the flag so no other shakes can trigger sound
+            isCoolingDown = true;
+            btn.classList.add('cooldown'); // Visual cue (dims the cat)
+
             const sound = audio.cloneNode();
             sound.play().then(() => {
-                // Flash text briefly
                 const oldText = debug.textContent;
                 debug.textContent = "MEOW!";
                 setTimeout(() => debug.textContent = oldText, 500);
@@ -137,12 +156,18 @@
                 log("Audio blocked. Tap cat first.");
             });
 
-            // Visual Shake
+            // Visual Shake Animation
             btn.classList.remove('shaking');
             void btn.offsetWidth; 
             btn.classList.add('shaking');
             
             if (navigator.vibrate) navigator.vibrate(100);
+
+            // 3. UNLOCK: After 1 second, allow meowing again
+            setTimeout(() => {
+                isCoolingDown = false;
+                btn.classList.remove('cooldown');
+            }, COOLDOWN_TIME);
         }
 
         btn.addEventListener('click', playMeow);
@@ -150,20 +175,15 @@
         // --- Shake Detection Logic ---
         let lastX = null, lastY = null, lastZ = null;
         let lastTime = 0;
-        const SHAKE_THRESHOLD = 15; 
 
         function handleMotion(event) {
-            // Use acceleration (no gravity) if available, else fallback
+            // If cooling down, don't even calculate math to save battery
+            if (isCoolingDown) return;
+
             const current = event.acceleration || event.accelerationIncludingGravity;
             
-            if (!current) {
-                log("Motion sensor active but no data.");
-                return;
-            }
+            if (!current) return;
 
-            // Print live data to debug to prove it works
-            log(`X: ${current.x?.toFixed(1)} | Y: ${current.y?.toFixed(1)} | Z: ${current.z?.toFixed(1)}`);
-            
             const currentTime = Date.now();
             if ((currentTime - lastTime) > 100) {
                 const diffTime = currentTime - lastTime;
@@ -178,7 +198,6 @@
                     const deltaY = Math.abs(lastY - y);
                     const deltaZ = Math.abs(lastZ - z);
                     
-                    // Simple sum calculation
                     if ((deltaX + deltaY + deltaZ) > SHAKE_THRESHOLD) {
                         playMeow();
                     }
@@ -188,7 +207,6 @@
         }
 
         // --- Permission Handling ---
-
         function requestPermission() {
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
@@ -197,30 +215,25 @@
                             window.addEventListener('devicemotion', handleMotion, true);
                             iosBtn.style.display = 'none';
                             log("Sensor Access Granted!");
-                            playMeow(); // Confirm with sound
+                            playMeow(); 
                         } else {
                             log("Permission Denied: " + permissionState);
                         }
                     })
                     .catch(e => {
-                        log("Error requesting permission: " + e);
-                        console.error(e);
+                        log("Error: " + e);
                     });
             } else {
-                // Non-iOS 13+ devices
                 window.addEventListener('devicemotion', handleMotion, true);
                 log("Standard sensor listener added.");
             }
         }
 
-        // Check if we need the button
         if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            // It is iOS 13+
             iosBtn.style.display = 'block';
             iosBtn.addEventListener('click', requestPermission);
             log("iOS detected. Tap 'Enable Shake'.");
         } else {
-            // Non-iOS or older device
             window.addEventListener('devicemotion', handleMotion, true);
             log("Standard device detected.");
         }
