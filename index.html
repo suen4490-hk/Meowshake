@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="manifest" href="manifest.json"> // for PWA
+    <link rel="apple-touch-icon" href="icon.png"> // for PWA
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Real Meowshake</title>
@@ -131,7 +133,7 @@
 
         // --- CONFIGURATION ---
         const SHAKE_THRESHOLD = 15; 
-        const COOLDOWN_TIME = 1200; // 1000ms = 1 second wait time between meows
+        const COOLDOWN_TIME = 1100; // 1000ms = 1 second wait time between meows
         
         let isCoolingDown = false; // The "Stop Gap" flag
 
